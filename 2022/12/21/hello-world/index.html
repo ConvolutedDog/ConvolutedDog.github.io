@@ -162,6 +162,9 @@
   
   
   
+    
+    <link rel="prefetch" href="//unpkg.com/valine/dist/Valine.min.js" as="script">
+  
   
 <meta name="generator" content="Hexo 5.4.2"></head>
 
@@ -420,6 +423,13 @@
   
 </div>
 
+  <div 
+    class="card card-content comment-card" 
+    style="margin-top: 16px;">
+    <div class="comment-card-title">评论</div>
+    
+  </div>
+
 <div 
   class="card card-content toc-card" 
   id="mobiletoc">
@@ -481,11 +491,8 @@
         <span>
           Copyright ©
           
-            2020
+            2022
           
-          
-                - 
-                2022
           
         </span>
         &nbsp;
@@ -526,6 +533,19 @@
     
     
     
+    
+      <div class="footer-dsc">
+        
+          本站总访问量<span id="busuanzi_value_site_pv"></span>次
+        
+        
+          <span>&nbsp;|&nbsp;</span>
+        
+        
+          本站总访客数<span id="busuanzi_value_site_uv"></span>次
+        
+      </div>
+      
     
 </footer>
  
@@ -601,6 +621,10 @@
      
      
     <script src="/js/main.js"></script> 
+    
+      <script> 
+        loadScript('/js/lib/busuanzi.min.js') 
+      </script>
      
     
       <script>
@@ -623,6 +647,10 @@
     <script src="//instant.page/5.1.0" type="module"
       integrity="sha384-by67kQnR+pyfy8yWP4kPO12fHKRLHZPfEsiSXR8u2IKcTdxD805MGUXBzVPnkLHw"></script>
     
+    
+      <script>
+        setTimeout(() => {localSearch("search.json")}, 0)
+      </script>
     
   </body>
 </html>

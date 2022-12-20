@@ -166,7 +166,7 @@
   
   
     
-    <link rel="prefetch" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js" as="script">
+    <link rel="prefetch" href="//unpkg.com/valine/dist/Valine.min.js" as="script">
   
   
 <meta name="generator" content="Hexo 5.4.2"></head>
@@ -431,31 +431,33 @@
     style="margin-top: 16px;">
     <div class="comment-card-title">评论</div>
     
-  <div id="gitalk-container"></div>
+  <div id="vcomments"></div>
   
-<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
-
-  
-<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
-
-  
-<script src="/js/lib/md5.min.js"></script>
-
   <script>
-    var gitalk = new Gitalk({
-      clientID: '54962938467e89c2553d',
-      clientSecret: '46e7263780e2229f76657f9433f84e597b678f6e',
-      repo: 'ConvolutedDog.github.io',
-      owner: 'ConvolutedDog',
-      admin: "ConvolutedDog",
-      id: md5(location.href),
-      distractionFreeMode: false,
-      language: 'navigator.language || navigator.userLanguage',
-      labels: ["Gitalk"],
-      perPage: 10
-    })
-
-    gitalk.render('gitalk-container')
+    loadScript("//unpkg.com/valine/dist/Valine.min.js");
+    var oldLoadVa = window.onload;
+    window.onload = function () {
+      oldLoadVa && oldLoadVa();
+      new Valine({
+        el: '#vcomments',
+        appId: 'Pw5eFMiPGQCnGiokefcfBEWW-gzGzoHsz',
+        appKey: 'H3TDUHORQqPGT4Sop8LUrMyq',
+        placeholder: 'Just go go',
+        path: window.location.pathname,
+        avatar: 'mp',
+        meta: ["nick","mail","link"],
+        pageSize: '10',
+        lang: '',
+        visitor: 'true',
+        highlight: true,
+        recordIP: true,
+        
+        
+        
+        enableQQ: 'false',
+        requiredFields: [],
+      });
+    };
   </script>
 
   </div>

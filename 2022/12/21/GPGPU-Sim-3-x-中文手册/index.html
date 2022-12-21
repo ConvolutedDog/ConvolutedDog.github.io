@@ -520,7 +520,31 @@ This page has been accessed 259,808 times.
 <p>这两种类型的单元都是流水线和SIMD。SP单元通常每个周期可以执行一条warp指令，而SFU单元根据指令类型，每几个周期只能执行一条新的warp指令。例如，SFU单元可以每4个周期执行一个正弦指令或每2个周期执行倒数指令。不同类型的指令也有不同的执行延迟。</p>
 <p>每个SIMT Core有一个SP单元和一个SFU单元。每个单元都有一个独立于操作数收集器的发出端口。两个单元共享连接到公共写回阶段的相同输出流水线寄存器。在操作数收集器的输出端有一个结果总线分配器，以确保单元不会因共享写回而停止。每一条指令都需要在结果总线中分配一个循环槽，然后才能发送给任何一个单元。请注意，内存流水线有自己的写回阶段，不受此结果总线分配器的管理。</p>
 <p>软件设计部分包含模型的更多实现细节。</p>
-<h3 id="（四）内存流水线（LDST单元）"><a href="#（四）内存流水线（LDST单元）" class="headerlink" title="（四）内存流水线（LDST单元）"></a>（四）内存流水线（LDST单元）</h3><p>GPGPU Sim支持CUDA中PTX中可见的各种内存空间。在我们的模型中，每个SIMT Core有4个不同的片上1级存储器：共享存储器、数据缓存、常量缓存和纹理缓存。下表显示了哪些片上存储器服务哪种类型的存储器访问：<br>| 核心存储器 | PTX访问 |<br>|:————–|:————–|<br>| 共享内存（R/W）| CUDA共享内存（OpenCL本地内存）只能访问 |<br>| 常量缓存（只读）| 常量内存和参数内存 |<br>| 纹理缓存（只读）| 仅纹理访问 |<br>| 数据缓存（R/W-写入时退出全局内存，写回本地内存）| 全局和本地内存访问（本地内存=OpenCL中的私有数据）|</p>
+<h3 id="（四）内存流水线（LDST单元）"><a href="#（四）内存流水线（LDST单元）" class="headerlink" title="（四）内存流水线（LDST单元）"></a>（四）内存流水线（LDST单元）</h3><p>GPGPU Sim支持CUDA中PTX中可见的各种内存空间。在我们的模型中，每个SIMT Core有4个不同的片上1级存储器：共享存储器、数据缓存、常量缓存和纹理缓存。下表显示了哪些片上存储器服务哪种类型的存储器访问：</p>
+<table>
+<thead>
+<tr>
+<th align="left">核心存储器</th>
+<th align="left">PTX访问</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">共享内存（R/W）</td>
+<td align="left">CUDA共享内存（OpenCL本地内存）只能访问</td>
+</tr>
+<tr>
+<td align="left">常量缓存（只读）</td>
+<td align="left">常量内存和参数内存</td>
+</tr>
+<tr>
+<td align="left">纹理缓存（只读）</td>
+<td align="left">仅纹理访问</td>
+</tr>
+<tr>
+<td align="left">数据缓存（R/W-写入时退出全局内存，写回本地内存）</td>
+<td align="left">全局和本地内存访问（本地内存=OpenCL中的私有数据）</td>
+</tr>
+</tbody></table>
 <p>尽管这些被建模为单独的物理结构，但它们都是内存流水线（LDST单元）的组件，因此它们都共享相同的写回阶段。以下介绍了这些空间的服务方式：</p>
 <ol>
 <li>纹理内存-对纹理内存的访问缓存在L1纹理缓存中（仅为纹理访问保留），也缓存在L2缓存中（如果启用）。L1纹理缓存是1998年论文<a target="_blank" rel="noopener" href="http://www-graphics.stanford.edu/papers/texture_prefetch/">[3]</a>中描述的一种特殊设计。GPU上的线程无法写入纹理内存空间，因此L1纹理缓存是只读的。</li>
@@ -533,7 +557,31 @@ This page has been accessed 259,808 times.
 <p>下面的小节描述了第一级内存结构。</p>
 <p><span id="L1DataCache"></span></p>
 <h4 id="1-L1-Data-Cache"><a href="#1-L1-Data-Cache" class="headerlink" title="1. L1 Data Cache"></a>1. L1 Data Cache</h4><p>L1 Data Cache是用于本地和全局内存访问的私有的、每个SIMT Core都有的、无阻塞的一级缓存。L1缓存没有划分bank，并且能够为每个SIMT Core周期的两个合并内存请求提供服务。传入的内存请求不能跨越一级数据缓存中的两个或多个Cache lines。还请注意，L1数据缓存不是一致性的。</p>
-<p>下表总结了一级数据缓存的写入策略：<br>| L1 data cache 写策略  | | |<br>|:————–|:————–|:————–|<br>|  | Local Memory | Global Memory |<br>| Write Hit | Write-back（写回） | Write-evict（写入逐出） |<br>| Write Miss | Write no-allocate（写不分配） | Write no-allocate（写不分配） |</p>
+<p>下表总结了一级数据缓存的写入策略：</p>
+<table>
+<thead>
+<tr>
+<th align="left">L1 data cache 写策略</th>
+<th align="left"></th>
+<th align="left"></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"></td>
+<td align="left">Local Memory</td>
+<td align="left">Global Memory</td>
+</tr>
+<tr>
+<td align="left">Write Hit</td>
+<td align="left">Write-back（写回）</td>
+<td align="left">Write-evict（写入逐出）</td>
+</tr>
+<tr>
+<td align="left">Write Miss</td>
+<td align="left">Write no-allocate（写不分配）</td>
+<td align="left">Write no-allocate（写不分配）</td>
+</tr>
+</tbody></table>
 <p>对于本地内存，一级数据缓存充当写不分配的写回缓存。对于全局内存，写命中会导致块被逐出。这模仿了PTX ISA规范<a target="_blank" rel="noopener" href="http://developer.nvidia.com/nvidia-gpu-computing-documentation">[5]</a>中概述的全局存储的默认策略。</p>
 <p>命中一级数据缓存的内存访问在一个SIMT Core时钟周期内提供服务。未命中的访问被插入FIFO未命中队列。每个SIMT时钟周期一个填充请求由L1数据缓存生成（假定互连注入缓冲区能够接受该请求）。</p>
 <p>缓存使用未命中状态保持寄存器（Miss Status Holding Registers，MSHR）来保持正在进行的未命中状态。它们被建模为完全关联数组。当一个请求正在运行时，对内存系统的冗余访问被合并到MSHR中。MSHR表具有固定数量的MSHR条目。每个MSHR条目可以为单个缓存行（Cache Line）提供固定数量的未命中请求。MSHR条目的数量和每个条目的最大请求数是可配置的。</p>
@@ -623,7 +671,39 @@ This page has been accessed 259,808 times.
 <h1 id="第三部分：如何使用GPGPU-SIM"><a href="#第三部分：如何使用GPGPU-SIM" class="headerlink" title="第三部分：如何使用GPGPU-SIM"></a>第三部分：如何使用GPGPU-SIM</h1><p>有关构建和运行GPGPU-Sim 3.x的说明，请参阅顶层GPGPU-Sim目录中的README文件。本节提供了有关使用GPGPU-Sim 3.x的其他重要指导，包括不同<a href="#%E6%A8%A1%E6%8B%9F%E6%A8%A1%E5%BC%8F">模拟模式</a>、<a href="#%E9%85%8D%E7%BD%AE%E9%80%89%E9%A1%B9">如何修改时序模型配置</a>、<a href="#%E4%B8%80%E8%88%AC%E6%A8%A1%E6%8B%9F%E7%BB%9F%E8%AE%A1">默认模拟统计的说明</a>，以及通过<a href="#%E7%94%A8%E4%BA%8E%E8%B0%83%E8%AF%95%E7%9A%84%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F">跟踪模拟状态</a>和<a href="#%E4%BA%A4%E4%BA%92%E5%BC%8F%E8%B0%83%E8%AF%95%E5%99%A8%E6%A8%A1%E5%BC%8F">类似GDB的接口</a>在功能级别分析bug的方法的描述。GPGPU Sim 3.x还为调试性能模拟错误提供了广泛的支持，包括<a href="#%E5%8F%AF%E8%A7%86%E5%8C%96%E9%AB%98%E5%B1%82%E6%AC%A1GPGPUSim%E5%BE%AE%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84%E8%A1%8C%E4%B8%BA">高级微体系结构可视化程序</a>和<a href="#%E5%8F%AF%E8%A7%86%E5%8C%96%E9%80%90%E5%91%A8%E6%9C%9F%E5%BE%AE%E4%BD%93%E7%B3%BB%E7%BB%93%E6%9E%84%E8%A1%8C%E4%B8%BA">逐周期流水线状态可视化</a>。接下来，我们将描述<a href="#%E6%80%A7%E8%83%BD%E6%A8%A1%E6%8B%9F%E4%B8%AD%E7%9A%84%E8%B0%83%E8%AF%95%E9%94%99%E8%AF%AF">在性能模拟模式下GPGPU-Sim崩溃或死锁时的调试策略</a>。最后，它以<a href="#%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98">常见问题的答案</a>作为结尾。</p>
 <p><span id="模拟模式"></span></p>
 <h2 id="一、模拟模式"><a href="#一、模拟模式" class="headerlink" title="一、模拟模式"></a>一、模拟模式</h2><p>默认情况下，大多数用户都希望使用GPGPU Sim 3.x来估计运行应用程序所需的GPU时钟周期数。这就是所谓的性能模拟模式。当尝试在GPGPU-Sim上运行新应用程序时，总是有可能应用程序无法正确运行——即可能会生成错误的输出。为了帮助调试此类应用程序，GPGPU Sim 3.x还支持快速功能模拟模式。此模式也可能有助于编译器研究和/或对功能模拟引擎进行更改。与性能和功能模拟之间的区别正交，GPGPU Sim 3.x还支持在NVIDIA GPU（当前仅为GT200和更早版本）上执行本地硬件ISA，通过我们称为PTXPlus的扩展PTX语法。以下各小节依次介绍这些功能。</p>
-<p>下表展示了GPGPU Sim的操作模式：<br>| CUDA Version |    PTX | PTXPlus |    cuobjdump+PTX |    cuobjdump+PTXPlus |<br>|:————-|:—–|:——–|:————–|:——————|<br>| $2.3$ | $?$ | $\color{red}{No}$ | $\color{red}{No}$ | $\color{red}{No}$ |<br>| $3.1$ |    $\color{green}{Yes}$ | $\color{red}{No}$ | $\color{red}{No}$ | $\color{red}{No}$ |<br>| $4.0$ |    $\color{red}{No}$ | $\color{red}{No}$| $\color{green}{Yes}$ |    $\color{green}{Yes}$ |</p>
+<p>下表展示了GPGPU Sim的操作模式：</p>
+<table>
+<thead>
+<tr>
+<th align="left">CUDA Version</th>
+<th align="left">PTX</th>
+<th align="left">PTXPlus</th>
+<th align="left">cuobjdump+PTX</th>
+<th align="left">cuobjdump+PTXPlus</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">$2.3$</td>
+<td align="left">$?$</td>
+<td align="left">$\color{red}{No}$</td>
+<td align="left">$\color{red}{No}$</td>
+<td align="left">$\color{red}{No}$</td>
+</tr>
+<tr>
+<td align="left">$3.1$</td>
+<td align="left">$\color{green}{Yes}$</td>
+<td align="left">$\color{red}{No}$</td>
+<td align="left">$\color{red}{No}$</td>
+<td align="left">$\color{red}{No}$</td>
+</tr>
+<tr>
+<td align="left">$4.0$</td>
+<td align="left">$\color{red}{No}$</td>
+<td align="left">$\color{red}{No}$</td>
+<td align="left">$\color{green}{Yes}$</td>
+<td align="left">$\color{green}{Yes}$</td>
+</tr>
+</tbody></table>
 <h3 id="（一）性能模拟"><a href="#（一）性能模拟" class="headerlink" title="（一）性能模拟"></a>（一）性能模拟</h3><p>性能模拟是模拟的默认模式，以较慢的模拟速度来收集性能统计信息，该信息来自于GPGPU-Sim模拟微体系结构模型部分中描述的微体系结构。</p>
 <p>要选择性能模拟模式，请将以下行添加到gpgpusim.config文件：</p>
 <pre class="highlight"><span class="line">-gpgpu_ptx_sim_mode 0</span><br></pre>
@@ -776,17 +856,513 @@ This page has been accessed 259,808 times.
 <h3 id="（一）用于调试的环境变量"><a href="#（一）用于调试的环境变量" class="headerlink" title="（一）用于调试的环境变量"></a>（一）用于调试的环境变量</h3><p>GPGPU Sim 3.x的一些与调试相关的行为可以通过环境变量进行配置。</p>
 <p>调试时，生成有关模拟器中正在发生的情况的附加信息并将其打印到标准输出可能会有所帮助。这是通过使用以下环境变量完成的：</p>
 <pre class="highlight"><span class="line"><span class="keyword">export</span> PTX_SIM_DEBUG=&lt;#&gt; enable debugging <span class="keyword">and</span> set the verbose level</span><br></pre>
-<p>当前支持的Level列举如下：<br>| Level | 描述 |<br>|:—-|:—- |<br>| 1   | Verbose logs for CTA allocation |<br>| 2   | Print verbose output from dominator analysis |<br>| 3   | Verbose logs for GPU malloc/memcpy/memset |<br>| 5   | Display the instruction executed |<br>| 6   | Display the modified register(s) by each executed instruction |<br>| 10  | Display the entire register file of the thread executing the instruction|<br>| 50  | Print verbose output from control flow analysis |<br>| 100 | Print the loaded PTX files |</p>
+<p>当前支持的Level列举如下：</p>
+<table>
+<thead>
+<tr>
+<th align="left">Level</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">1</td>
+<td align="left">Verbose logs for CTA allocation</td>
+</tr>
+<tr>
+<td align="left">2</td>
+<td align="left">Print verbose output from dominator analysis</td>
+</tr>
+<tr>
+<td align="left">3</td>
+<td align="left">Verbose logs for GPU malloc/memcpy/memset</td>
+</tr>
+<tr>
+<td align="left">5</td>
+<td align="left">Display the instruction executed</td>
+</tr>
+<tr>
+<td align="left">6</td>
+<td align="left">Display the modified register(s) by each executed instruction</td>
+</tr>
+<tr>
+<td align="left">10</td>
+<td align="left">Display the entire register file of the thread executing the instruction</td>
+</tr>
+<tr>
+<td align="left">50</td>
+<td align="left">Print verbose output from control flow analysis</td>
+</tr>
+<tr>
+<td align="left">100</td>
+<td align="left">Print the loaded PTX files</td>
+</tr>
+</tbody></table>
 <p>如果基准测试在GPGPU-Sim上运行不正确，您可能需要调试功能模拟引擎。我们这样做的方式是打印出生成错误输出的单个线程的功能状态。要启用打印单个线程的功能模拟状态，请使用以下环境变量（并为<code>PTX_SIM_DEBUG</code>设置适当的级别）：</p>
 <pre class="highlight"><span class="line"><span class="keyword">export</span> PTX_SIM_DEBUG_THREAD_UID=&lt;#&gt; ID of thread to debug</span><br></pre>
 <p>其他环境配置选项：</p>
 <pre class="highlight"><span class="line"><span class="keyword">export</span> PTX_SIM_USE_PTX_FILE=&lt;non-empty-string&gt; <span class="keyword">override</span> PTX embedded in the binary <span class="keyword">and</span> revert to old strategy of looking <span class="keyword">for</span> *.ptx <span class="built_in">files</span> (good <span class="keyword">for</span> hand-tweaking PTX)</span><br><span class="line"><span class="keyword">export</span> PTX_SIM_KERNELFILE=&lt;filename&gt; use <span class="keyword">this</span> to specify the name of the PTX file</span><br></pre>
 
-<h3 id="（二）GPGPU-Sim-debug追踪"><a href="#（二）GPGPU-Sim-debug追踪" class="headerlink" title="（二）GPGPU-Sim debug追踪"></a>（二）GPGPU-Sim debug追踪</h3><p>跟踪系统由<code>gpgpusim.config</code>中的变量控制：<br>| 变量 | 值 | 描述 |<br>|:—-|:—-|:—-|<br>|trace_enabled| 0 or 1 |全局启用或禁用所有跟踪。如果启用，则打印<code>trace_components</code>。|<br>|trace_components| &lt;WARP_SCHEDULER,SCOREBOARD,…&gt; |要启用的跟踪元素的逗号分隔列表，完整列表可在<code>src/trace_streams.tup</code>中找到。|<br>|trace_sampling_core| &lt;0 through num_cores-1&gt; |对于与给定shader core关联的元素（如warp调度器或记分牌），仅打印来自该核心的轨迹。|</p>
-<p>实施该系统的代码文件包括：<br>| 变量 | 描述 |<br>|:—-|:—-|<br>|src/trace_streams.tup|列出每个打印流的名称|<br>|src/trace.cc|一些设置实现和初始化|<br>|src/trace.h|定义追踪系统的所有高级接口|<br>|src/gpgpu-sim/shader_trace.h|定义一些用于调试特定shader core的方便打印|</p>
+<h3 id="（二）GPGPU-Sim-debug追踪"><a href="#（二）GPGPU-Sim-debug追踪" class="headerlink" title="（二）GPGPU-Sim debug追踪"></a>（二）GPGPU-Sim debug追踪</h3><p>跟踪系统由<code>gpgpusim.config</code>中的变量控制：</p>
+<table>
+<thead>
+<tr>
+<th align="left">变量</th>
+<th align="left">值</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">trace_enabled</td>
+<td align="left">0 or 1</td>
+<td align="left">全局启用或禁用所有跟踪。如果启用，则打印<code>trace_components</code>。</td>
+</tr>
+<tr>
+<td align="left">trace_components</td>
+<td align="left">&lt;WARP_SCHEDULER,SCOREBOARD,…&gt;</td>
+<td align="left">要启用的跟踪元素的逗号分隔列表，完整列表可在<code>src/trace_streams.tup</code>中找到。</td>
+</tr>
+<tr>
+<td align="left">trace_sampling_core</td>
+<td align="left">&lt;0 through num_cores-1&gt;</td>
+<td align="left">对于与给定shader core关联的元素（如warp调度器或记分牌），仅打印来自该核心的轨迹。</td>
+</tr>
+</tbody></table>
+<p>实施该系统的代码文件包括：</p>
+<table>
+<thead>
+<tr>
+<th align="left">变量</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">src/trace_streams.tup</td>
+<td align="left">列出每个打印流的名称</td>
+</tr>
+<tr>
+<td align="left">src/trace.cc</td>
+<td align="left">一些设置实现和初始化</td>
+</tr>
+<tr>
+<td align="left">src/trace.h</td>
+<td align="left">定义追踪系统的所有高级接口</td>
+</tr>
+<tr>
+<td align="left">src/gpgpu-sim/shader_trace.h</td>
+<td align="left">定义一些用于调试特定shader core的方便打印</td>
+</tr>
+</tbody></table>
 <p><span id="配置选项"></span></p>
 <h2 id="三、配置选项"><a href="#三、配置选项" class="headerlink" title="三、配置选项"></a>三、配置选项</h2><p>配置选项通过<code>gpgpusim.config</code>传递到GPGPU-Sim和互连配置文件（在<code>gpgpusim.config</code>中使用选项<code>-inter_config_file</code>指定）。GPGPU Sim 3.0.2附带了NVIDIA GT200（<code>configs/QuadroFX5800/</code>）和费米（<code>configs/Fermi/</code>）的configs目录中的校准配置文件。</p>
-<p>以下是配置选项列表：<br>| 仿真运行配置 |  |<br>|:—|:—|<br>| 选项 | 描述 |<br>|<code>-gpgpu_max_cycle &lt;# cycles&gt;</code>|在达到最大周期数后尽早终止GPU模拟(0 = no limit)|<br>|<code>-gpgpu_max_insn &lt;# insns&gt;</code>|在达到最大指令数后尽早终止GPU模拟(0 = no limit)|<br>|<code>-gpgpu_ptx_sim_mode &lt;0=performance (default), 1=functional&gt;</code>|在性能或功能模拟之间进行选择（请注意，功能模拟可能会错误地模拟某些ptx代码，这些代码需要warp的每个元素在lock-step中执行）|<br>|<code>-gpgpu_deadlock_detect &lt;0=off, 1=on (default)&gt;</code>|在死锁时停止模拟|<br>|<code>-gpgpu_max_cta</code>|在达到最大CTA数后尽早终止GPU模拟(0 = no limit)|<br>|<code>-gpgpu_max_concurrent_kernel</code>|可以在GPU上同时运行的最大内核数|<br>| 统计信息收集选项 |  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_ptx_instruction_classification &lt;0=off, 1=on (default)&gt;</code>|启用指令分类|<br>|<code>-gpgpu_runtime_stat &lt;frequency&gt;:&lt;flag&gt;</code>|显示运行时统计信息|<br>|<code>-gpgpu_memlatency_stat</code>|收集内存延迟统计信息（0x2启用MC，0x4启用队列日志）|<br>|<code>-visualizer_enabled &lt;0=off, 1=on (default)&gt;</code>|打开可视化工具输出（使用AerialVision可视化工具绘制保存在日志中的数据）|<br>|<code>-visualizer_outputfile &lt;filename&gt;</code>|指定可视化工具的输出日志文件。自动生成的文件名设置为NULL（默认情况下为“Done”）。|<br>|<code>-visualizer_zlevel &lt;compression level&gt;</code>|可视化工具输出日志的压缩级别（0=无压缩，9=最大压缩）|<br>|<code>-save_embedded_ptx</code>|将二进制文件中嵌入的ptx文件保存为<code>&lt;n&gt;.ptx</code>|<br>|<code>-enable_ptx_file_line_stats &lt;0=off, 1=on (default)&gt;</code>|打开ptx的source line统计分析|<br>|<code>-ptx_line_stats_filename &lt;output file name&gt;</code>|ptx的source line统计的输出文件|<br>|<code>-gpgpu_warpdistro_shader</code>|指定从哪个shader core收集warp大小分布|<br>|<code>-gpgpu_cflog_interval</code>|控制流记录器中每个快照之间的间隔|<br>|<code>-keep</code>|在与外部程序接口时保留GPGPU-Sim创建的中间文件|<br>|高级体系结构配置（有关建模内容的详细信息，参阅ISPASS论文）|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_n_mem &lt;# memory controller&gt;</code>|此配置中的内存控制器（DRAM Channel）数量。修改此选项之前，请阅读<a href="#%E6%8B%93%E6%89%91%E9%85%8D%E7%BD%AE">#拓扑配置</a>。|<br>|<code>-gpgpu_clock_domains &lt;Core Clock&gt;:&lt;Interconnect Clock&gt;:&lt;L2 Clock&gt;:&lt;DRAM Clock&gt;</code>|MhZ中的时钟域频率（请参阅<a href="#%E6%97%B6%E9%92%9F%E5%9F%9F%E9%85%8D%E7%BD%AE">#时钟域配置</a>）|<br>|<code>-gpgpu_n_clusters</code>|处理集群的数量|<br>|<code>-gpgpu_n_cores_per_cluster</code>|每个群集的SIMD核数|<br>|额外体系结构配置|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_n_cluster_ejection_buffer_size</code>|弹出缓冲区中的数据包数|<br>|<code>-gpgpu_n_ldst_response_buffer_size</code>|LD/ST单元弹出缓冲区中的响应包数|<br>|<code>-gpgpu_coalesce_arch</code>|合并拱门（Coalescing arch）（默认值=13，其他任何功能暂时关闭）|<br>|调度器|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_num_sched_per_core</code>|每个核心warp调度器数|<br>|<code>-gpgpu_max_insn_issue_per_warp</code>|调度器在一个周期内每个warp可以发出的最大指令数|<br>|Shader Core Pipeline配置|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_shader_core_pipeline &lt;# thread/shader core&gt;:&lt;warp size&gt;:&lt;pipeline SIMD width&gt;</code>|Shader Core Pipeline配置|<br>|<code>-gpgpu_shader_registers &lt;# registers/shader core, default=8192&gt;</code>|每个shader core核心的寄存器数。并发CTA的限制数量。|<br>|<code>-gpgpu_shader_cta &lt;# CTA/shader core, default=8&gt;</code>|shader core中并发cta的最大数量|<br>|<code>-gpgpu_simd_model &lt;1=immediate post-dominator, others are not supported for now&gt;</code>|SIMD分支分歧处理策略|<br>|<code>-ptx_opcode_latency_int/fp/dp &lt;ADD,MAX,MUL,MAD,DIV&gt;</code>|操作码延迟|<br>|<code>-ptx_opcode_initiation_int/fp/dp &lt;ADD,MAX,MUL,MAD,DIV&gt;</code>|操作码初始化周期。对于这个周期数，ALU的输入保持恒定。ALU在此期间不能使用新值。即如果该值为4，则意味着该单元可以每4个周期消耗一次新值。|<br>|内存子系统配置|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_perfect_mem &lt;0=off (default), 1=on&gt;</code>|启用完美内存模式（零内存延迟，缓存全部命中）|<br>|<code>-gpgpu_tex_cache:l1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;:&lt;fifo_entry&gt;</code>|纹理缓存（只读）配置。逐出策略：L=LRU，F=FIFO，R=随机|<br>|<code>-gpgpu_const_cache:l1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code>|常量缓存（只读）配置。逐出策略：L=LRU，F=FIFO，R=随机|<br>|<code>-gpgpu_cache:il1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code>|shader L1指令缓存（用于全局和本地内存）配置。逐出策略：L=LRU，F=FIFO，R=随机|<br>|<code>-gpgpu_cache:dl1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code> （如果没有DL1，则设置为<code>none</code>）|L1数据缓存（用于全局和本地存储器）配置。逐出策略：L=LRU，F=FIFO，R=随机|<br>|<code>-gpgpu_cache:dl2 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code>|统一的分Bank的二级数据缓存配置。这指定了其中一个内存分区中的二级缓存组的配置。二级缓存总容量=<nsets>x<bsize>x<assoc>x&lt;# memory controller&gt;|<br>|<code>-gpgpu_shmem_size &lt;shared memory size, default=16kB&gt;</code>|每个SIMT Core（也称为Shader Core）的共享内存大小|<br>|<code>-gpgpu_shmem_warp_parts</code>|共享内存冲突检查将warp划分为的部分数（Number of portions a warp is divided into for shared memory bank conflict check）|<br>|<code>-gpgpu_flush_cache &lt;0=off (default), 1=on&gt;</code>|在每个内核调用结束时刷新缓存|<br>|<code>-gpgpu_local_mem_map</code>|从本地内存空间地址映射到模拟GPU物理地址空间(default = enabled)|<br>|<code>-gpgpu_num_reg_banks</code>|寄存器组数(default = 8)|<br>|<code>-gpgpu_reg_bank_use_warp_id</code>|在将寄存器映射到存储Bank时使用warp id(default = off)|<br>|<code>-gpgpu_cache:dl2_texture_only</code>|二级缓存仅用于纹理(0=no, 1=yes, default=1)|<br>|操作数收集器配置|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_operand_collector_num_units_sp</code>|采集器单元数（默认值=4）|<br>|<code>-gpgpu_operand_collector_num_units_sfu</code>|采集器单元数（默认值=4）|<br>|<code>-gpgpu_operand_collector_num_units_mem</code>|采集器单元数（默认值=2）|<br>|<code>-gpgpu_operand_collector_num_units_gen</code>|采集器单元数（默认值=0）|<br>|<code>-gpgpu_operand_collector_num_in_ports_sp</code>|端口中采集器单元的数量（默认值=1）|<br>|<code>-gpgpu_operand_collector_num_in_ports_sfu</code>|端口中采集器单元的数量（默认值=1）|<br>|<code>-gpgpu_operand_collector_num_in_ports_mem</code>|端口中采集器单元的数量（默认值=1）|<br>|<code>-gpgpu_operand_collector_num_in_ports_gen</code>|端口中采集器单元的数量（默认值=0）|<br>|<code>-gpgpu_operand_collector_num_out_ports_sp</code>|端口中采集器单元的数量（默认值=1）|<br>|<code>-gpgpu_operand_collector_num_out_ports_sfu</code>|端口中采集器单元的数量（默认值=1）|<br>|<code>-gpgpu_operand_collector_num_out_ports_mem</code>|端口中采集器单元的数量（默认值=1）|<br>|<code>-gpgpu_operand_collector_num_out_ports_gen</code>|端口中采集器单元的数量（默认值=0）|<br>|DRAM/Memory控制器配置|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_dram_scheduler &lt;0 = fifo, 1 = fr-fcfs&gt;</code>|DRAM调度程序类型|<br>|<code>-gpgpu_frfcfs_dram_sched_queue_size &lt;# entries&gt;</code>|DRAM FRFCFS调度程序队列大小(0 = unlimited (default); # entries per chip)(FIFO调度程序队列大小固定为2)|<br>|<code>-gpgpu_dram_return_queue_size &lt;# entries&gt;</code>|DRAM请求返回队列大小 (0 = unlimited (default); # entries per chip)|<br>|<code>-gpgpu_dram_buswidth &lt;# bytes/DRAM bus cycle, default=4 bytes, i.e. 8 bytes/command clock cycle&gt;</code>|单个DRAM芯片在命令总线频率下的总线带宽（默认值为4字节（每个命令时钟周期8字节））。每个内存控制器的DRAM芯片数量由选项<code>-gpgpu_n_mem_per_ctrlr</code>设置。每个存储器分区具有（<code>gpgpu_dram_buswidth</code> x <code>gpgpu_n_mem_per_ctrlr</code>）位的DRAM数据总线引脚。例如，Quadro FX5800有一条512位DRAM数据总线，分为8个内存分区。每个存储器分区一个512/8＝64位的DRAM数据总线。该64位总线被分割为每个存储器分区的2个DRAM芯片。每个芯片将具有32位=4字节的DRAM总线宽度。因此，我们将<code>-gpgpu_dram_buswidth</code>设置为4。|<br>|<code>-gpgpu_dram_burst_length &lt;# burst per DRAM request&gt;</code>|每个DRAM请求的Burst长度（默认值=4个数据时钟周期，在GDDR3中以2倍命令时钟频率运行）|<br>|<code>-gpgpu_dram_timing_opt &lt;nbk:tCCD:tRRD:tRCD:tRAS:tRP:tRC:CL:WL:tWTR&gt;</code>|DRAM时序参数: [nbk = number of banks][tCCD = CAS to CAS command delay (always = half of burst length)][tRRD = Row active to row active delay][tRCD = RAW to CAS delay][tRAS = Row active time][tRP = Row precharge time][tRC = Row cycle time][CL = CAS latency][WL = Write latency][tWTR = Write to read delay]<br>|<code>-gpgpu_mem_address_mask &lt;address decoding scheme&gt;</code>|Obsolete: 选择不同的地址解码方案以在不同的存储体之间扩展内存访问。（0=旧寻址掩码，1=新寻址掩码，2=新添加掩码+翻转的存储体和芯片选择位）<br>|<code>-gpgpu_mem_addr_mapping dramid@&lt;start bit&gt;;&lt;memory address map&gt;</code>|将内存地址映射到DRAM模型：[start bit] = 用于指定DRAM ChannelID的位的起始位置(这意味着下一个Log2(#DRAM channel)位将被用作DRAM ChannelID，并且整个地址映射将根据使用的位数进行移位)。 [memory address map] = 一个64字符的字符串，指定如何将内存地址中的每个位解码为行（R）、列（C）和Bank（B）地址。位于单个DRAM Burst内的部分地址应使用（S）指定。请参见Quadro FX 5800的配置文件。|<br>|<code>-gpgpu_n_mem_per_ctrlr &lt;# DRAM chips/memory controller&gt;</code>|每个内存控制器的DRAM芯片数量（也称为DRAM Channel）(aka DRAM channel)|<br>|<code>-gpgpu_dram_partition_queues</code>|i2$:$2d:d2$:$2i|<br>|<code>-rop_latency &lt;# minimum cycle before L2 cache access&gt;</code>|指定内存请求到达内存分区时与访问二级缓存/进入队列以访问DRAM之间的最小延迟（以核心时钟周期为单位）。它模拟了最小的L2命中延迟。|<br>|<code>-dram_latency &lt;# minimum cycle after L2 cache access and before DRAM access&gt;</code>|指定内存请求访问二级缓存和其被推入DRAM调度器之间的最小延迟（以核心时钟周期为单位）。此选项与<code>-rop_latency</code>一起工作，以模拟最小DRAM访问延迟（<code>=rop_latency+DRAM_latency</code>）。|<br>|互连配置|  |<br>| 选项 | 描述 |<br>|<code>-inter_config_file &lt;Path to Interconnection Config file&gt;</code>|包含互连网络模拟器选项的文件。有关互连配置的更多详细信息，请参见<a target="_blank" rel="noopener" href="http://cva.stanford.edu/books/ppin/">[6]</a>中随原始代码提供的手册。注意，模拟器中不应使用<code>4.6 Traffic</code>和<code>4.7 Simulation parameters</code>下的选项。另请参阅<a href="#%E4%BA%92%E8%BF%9E%E9%85%8D%E7%BD%AE">#互连配置</a>。|<br>|<code>-network_mode</code>|要使用的互连网络模式（默认值=1）|<br>|PTX配置|  |<br>| 选项 | 描述 |<br>|<code>-gpgpu_ptx_use_cuobjdump</code>|使用cuobjdump提取ptx/sass（0=否，1=是）仅限CUDA 4.0|<br>|<code>-gpgpu_ptx_convert_to_ptxplus</code>|将嵌入式ptx转换为ptxplus（0=否，1=是）|<br>|<code>-gpgpu_ptx_save_converted_ptxplus</code>|将转换后的ptxplus保存到文件（0=否，1=是）|<br>|<code>-gpgpu_ptx_force_max_capability</code>|强制最大计算能力（默认值为0）|<br>|<code>-gpgpu_ptx_inst_debug_to_file</code>|将执行的指令的调试信息转储到文件中（0=否，1=是）|<br>|<code>-gpgpu_ptx_inst_debug_file</code>|输出文件以转储已执行指令的调试信息|<br>|<code>-gpgpu_ptx_inst_debug_thread_uid</code>|已执行指令的调试输出的线程uid|</p>
+<p>以下是配置选项列表：</p>
+<table>
+<thead>
+<tr>
+<th align="left">仿真运行配置</th>
+<th align="left"></th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_max_cycle &lt;# cycles&gt;</code></td>
+<td align="left">在达到最大周期数后尽早终止GPU模拟(0 = no limit)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_max_insn &lt;# insns&gt;</code></td>
+<td align="left">在达到最大指令数后尽早终止GPU模拟(0 = no limit)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_sim_mode &lt;0=performance (default), 1=functional&gt;</code></td>
+<td align="left">在性能或功能模拟之间进行选择（请注意，功能模拟可能会错误地模拟某些ptx代码，这些代码需要warp的每个元素在lock-step中执行）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_deadlock_detect &lt;0=off, 1=on (default)&gt;</code></td>
+<td align="left">在死锁时停止模拟</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_max_cta</code></td>
+<td align="left">在达到最大CTA数后尽早终止GPU模拟(0 = no limit)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_max_concurrent_kernel</code></td>
+<td align="left">可以在GPU上同时运行的最大内核数</td>
+</tr>
+<tr>
+<td align="left">统计信息收集选项</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_instruction_classification &lt;0=off, 1=on (default)&gt;</code></td>
+<td align="left">启用指令分类</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_runtime_stat &lt;frequency&gt;:&lt;flag&gt;</code></td>
+<td align="left">显示运行时统计信息</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_memlatency_stat</code></td>
+<td align="left">收集内存延迟统计信息（0x2启用MC，0x4启用队列日志）</td>
+</tr>
+<tr>
+<td align="left"><code>-visualizer_enabled &lt;0=off, 1=on (default)&gt;</code></td>
+<td align="left">打开可视化工具输出（使用AerialVision可视化工具绘制保存在日志中的数据）</td>
+</tr>
+<tr>
+<td align="left"><code>-visualizer_outputfile &lt;filename&gt;</code></td>
+<td align="left">指定可视化工具的输出日志文件。自动生成的文件名设置为NULL（默认情况下为“Done”）。</td>
+</tr>
+<tr>
+<td align="left"><code>-visualizer_zlevel &lt;compression level&gt;</code></td>
+<td align="left">可视化工具输出日志的压缩级别（0=无压缩，9=最大压缩）</td>
+</tr>
+<tr>
+<td align="left"><code>-save_embedded_ptx</code></td>
+<td align="left">将二进制文件中嵌入的ptx文件保存为<code>&lt;n&gt;.ptx</code></td>
+</tr>
+<tr>
+<td align="left"><code>-enable_ptx_file_line_stats &lt;0=off, 1=on (default)&gt;</code></td>
+<td align="left">打开ptx的source line统计分析</td>
+</tr>
+<tr>
+<td align="left"><code>-ptx_line_stats_filename &lt;output file name&gt;</code></td>
+<td align="left">ptx的source line统计的输出文件</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_warpdistro_shader</code></td>
+<td align="left">指定从哪个shader core收集warp大小分布</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_cflog_interval</code></td>
+<td align="left">控制流记录器中每个快照之间的间隔</td>
+</tr>
+<tr>
+<td align="left"><code>-keep</code></td>
+<td align="left">在与外部程序接口时保留GPGPU-Sim创建的中间文件</td>
+</tr>
+<tr>
+<td align="left">高级体系结构配置（有关建模内容的详细信息，参阅ISPASS论文）</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_n_mem &lt;# memory controller&gt;</code></td>
+<td align="left">此配置中的内存控制器（DRAM Channel）数量。修改此选项之前，请阅读<a href="#%E6%8B%93%E6%89%91%E9%85%8D%E7%BD%AE">#拓扑配置</a>。</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_clock_domains &lt;Core Clock&gt;:&lt;Interconnect Clock&gt;:&lt;L2 Clock&gt;:&lt;DRAM Clock&gt;</code></td>
+<td align="left">MhZ中的时钟域频率（请参阅<a href="#%E6%97%B6%E9%92%9F%E5%9F%9F%E9%85%8D%E7%BD%AE">#时钟域配置</a>）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_n_clusters</code></td>
+<td align="left">处理集群的数量</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_n_cores_per_cluster</code></td>
+<td align="left">每个群集的SIMD核数</td>
+</tr>
+<tr>
+<td align="left">额外体系结构配置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_n_cluster_ejection_buffer_size</code></td>
+<td align="left">弹出缓冲区中的数据包数</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_n_ldst_response_buffer_size</code></td>
+<td align="left">LD/ST单元弹出缓冲区中的响应包数</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_coalesce_arch</code></td>
+<td align="left">合并拱门（Coalescing arch）（默认值=13，其他任何功能暂时关闭）</td>
+</tr>
+<tr>
+<td align="left">调度器</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_num_sched_per_core</code></td>
+<td align="left">每个核心warp调度器数</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_max_insn_issue_per_warp</code></td>
+<td align="left">调度器在一个周期内每个warp可以发出的最大指令数</td>
+</tr>
+<tr>
+<td align="left">Shader Core Pipeline配置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_shader_core_pipeline &lt;# thread/shader core&gt;:&lt;warp size&gt;:&lt;pipeline SIMD width&gt;</code></td>
+<td align="left">Shader Core Pipeline配置</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_shader_registers &lt;# registers/shader core, default=8192&gt;</code></td>
+<td align="left">每个shader core核心的寄存器数。并发CTA的限制数量。</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_shader_cta &lt;# CTA/shader core, default=8&gt;</code></td>
+<td align="left">shader core中并发cta的最大数量</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_simd_model &lt;1=immediate post-dominator, others are not supported for now&gt;</code></td>
+<td align="left">SIMD分支分歧处理策略</td>
+</tr>
+<tr>
+<td align="left"><code>-ptx_opcode_latency_int/fp/dp &lt;ADD,MAX,MUL,MAD,DIV&gt;</code></td>
+<td align="left">操作码延迟</td>
+</tr>
+<tr>
+<td align="left"><code>-ptx_opcode_initiation_int/fp/dp &lt;ADD,MAX,MUL,MAD,DIV&gt;</code></td>
+<td align="left">操作码初始化周期。对于这个周期数，ALU的输入保持恒定。ALU在此期间不能使用新值。即如果该值为4，则意味着该单元可以每4个周期消耗一次新值。</td>
+</tr>
+<tr>
+<td align="left">内存子系统配置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_perfect_mem &lt;0=off (default), 1=on&gt;</code></td>
+<td align="left">启用完美内存模式（零内存延迟，缓存全部命中）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_tex_cache:l1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;:&lt;fifo_entry&gt;</code></td>
+<td align="left">纹理缓存（只读）配置。逐出策略：L=LRU，F=FIFO，R=随机</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_const_cache:l1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code></td>
+<td align="left">常量缓存（只读）配置。逐出策略：L=LRU，F=FIFO，R=随机</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_cache:il1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code></td>
+<td align="left">shader L1指令缓存（用于全局和本地内存）配置。逐出策略：L=LRU，F=FIFO，R=随机</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_cache:dl1 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code> （如果没有DL1，则设置为<code>none</code>）</td>
+<td align="left">L1数据缓存（用于全局和本地存储器）配置。逐出策略：L=LRU，F=FIFO，R=随机</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_cache:dl2 &lt;nsets&gt;:&lt;bsize&gt;:&lt;assoc&gt;,&lt;rep&gt;:&lt;wr&gt;:&lt;alloc&gt;:&lt;wr_alloc&gt;,&lt;mshr&gt;:&lt;N&gt;:&lt;merge&gt;,&lt;mq&gt;</code></td>
+<td align="left">统一的分Bank的二级数据缓存配置。这指定了其中一个内存分区中的二级缓存组的配置。二级缓存总容量=<nsets>x<bsize>x<assoc>x&lt;# memory controller&gt;</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_shmem_size &lt;shared memory size, default=16kB&gt;</code></td>
+<td align="left">每个SIMT Core（也称为Shader Core）的共享内存大小</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_shmem_warp_parts</code></td>
+<td align="left">共享内存冲突检查将warp划分为的部分数（Number of portions a warp is divided into for shared memory bank conflict check）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_flush_cache &lt;0=off (default), 1=on&gt;</code></td>
+<td align="left">在每个内核调用结束时刷新缓存</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_local_mem_map</code></td>
+<td align="left">从本地内存空间地址映射到模拟GPU物理地址空间(default = enabled)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_num_reg_banks</code></td>
+<td align="left">寄存器组数(default = 8)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_reg_bank_use_warp_id</code></td>
+<td align="left">在将寄存器映射到存储Bank时使用warp id(default = off)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_cache:dl2_texture_only</code></td>
+<td align="left">二级缓存仅用于纹理(0=no, 1=yes, default=1)</td>
+</tr>
+<tr>
+<td align="left">操作数收集器配置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_units_sp</code></td>
+<td align="left">采集器单元数（默认值=4）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_units_sfu</code></td>
+<td align="left">采集器单元数（默认值=4）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_units_mem</code></td>
+<td align="left">采集器单元数（默认值=2）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_units_gen</code></td>
+<td align="left">采集器单元数（默认值=0）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_in_ports_sp</code></td>
+<td align="left">端口中采集器单元的数量（默认值=1）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_in_ports_sfu</code></td>
+<td align="left">端口中采集器单元的数量（默认值=1）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_in_ports_mem</code></td>
+<td align="left">端口中采集器单元的数量（默认值=1）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_in_ports_gen</code></td>
+<td align="left">端口中采集器单元的数量（默认值=0）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_out_ports_sp</code></td>
+<td align="left">端口中采集器单元的数量（默认值=1）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_out_ports_sfu</code></td>
+<td align="left">端口中采集器单元的数量（默认值=1）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_out_ports_mem</code></td>
+<td align="left">端口中采集器单元的数量（默认值=1）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_operand_collector_num_out_ports_gen</code></td>
+<td align="left">端口中采集器单元的数量（默认值=0）</td>
+</tr>
+<tr>
+<td align="left">DRAM/Memory控制器配置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_dram_scheduler &lt;0 = fifo, 1 = fr-fcfs&gt;</code></td>
+<td align="left">DRAM调度程序类型</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_frfcfs_dram_sched_queue_size &lt;# entries&gt;</code></td>
+<td align="left">DRAM FRFCFS调度程序队列大小(0 = unlimited (default); # entries per chip)(FIFO调度程序队列大小固定为2)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_dram_return_queue_size &lt;# entries&gt;</code></td>
+<td align="left">DRAM请求返回队列大小 (0 = unlimited (default); # entries per chip)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_dram_buswidth &lt;# bytes/DRAM bus cycle, default=4 bytes, i.e. 8 bytes/command clock cycle&gt;</code></td>
+<td align="left">单个DRAM芯片在命令总线频率下的总线带宽（默认值为4字节（每个命令时钟周期8字节））。每个内存控制器的DRAM芯片数量由选项<code>-gpgpu_n_mem_per_ctrlr</code>设置。每个存储器分区具有（<code>gpgpu_dram_buswidth</code> x <code>gpgpu_n_mem_per_ctrlr</code>）位的DRAM数据总线引脚。例如，Quadro FX5800有一条512位DRAM数据总线，分为8个内存分区。每个存储器分区一个512/8＝64位的DRAM数据总线。该64位总线被分割为每个存储器分区的2个DRAM芯片。每个芯片将具有32位=4字节的DRAM总线宽度。因此，我们将<code>-gpgpu_dram_buswidth</code>设置为4。</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_dram_burst_length &lt;# burst per DRAM request&gt;</code></td>
+<td align="left">每个DRAM请求的Burst长度（默认值=4个数据时钟周期，在GDDR3中以2倍命令时钟频率运行）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_dram_timing_opt &lt;nbk:tCCD:tRRD:tRCD:tRAS:tRP:tRC:CL:WL:tWTR&gt;</code></td>
+<td align="left">DRAM时序参数: [nbk = number of banks][tCCD = CAS to CAS command delay (always = half of burst length)][tRRD = Row active to row active delay][tRCD = RAW to CAS delay][tRAS = Row active time][tRP = Row precharge time][tRC = Row cycle time][CL = CAS latency][WL = Write latency][tWTR = Write to read delay]</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_mem_address_mask &lt;address decoding scheme&gt;</code></td>
+<td align="left">Obsolete: 选择不同的地址解码方案以在不同的存储体之间扩展内存访问。（0=旧寻址掩码，1=新寻址掩码，2=新添加掩码+翻转的存储体和芯片选择位）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_mem_addr_mapping dramid@&lt;start bit&gt;;&lt;memory address map&gt;</code></td>
+<td align="left">将内存地址映射到DRAM模型：[start bit] = 用于指定DRAM ChannelID的位的起始位置(这意味着下一个Log2(#DRAM channel)位将被用作DRAM ChannelID，并且整个地址映射将根据使用的位数进行移位)。 [memory address map] = 一个64字符的字符串，指定如何将内存地址中的每个位解码为行（R）、列（C）和Bank（B）地址。位于单个DRAM Burst内的部分地址应使用（S）指定。请参见Quadro FX 5800的配置文件。</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_n_mem_per_ctrlr &lt;# DRAM chips/memory controller&gt;</code></td>
+<td align="left">每个内存控制器的DRAM芯片数量（也称为DRAM Channel）(aka DRAM channel)</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_dram_partition_queues</code></td>
+<td align="left">i2$:$2d:d2$:$2i</td>
+</tr>
+<tr>
+<td align="left"><code>-rop_latency &lt;# minimum cycle before L2 cache access&gt;</code></td>
+<td align="left">指定内存请求到达内存分区时与访问二级缓存/进入队列以访问DRAM之间的最小延迟（以核心时钟周期为单位）。它模拟了最小的L2命中延迟。</td>
+</tr>
+<tr>
+<td align="left"><code>-dram_latency &lt;# minimum cycle after L2 cache access and before DRAM access&gt;</code></td>
+<td align="left">指定内存请求访问二级缓存和其被推入DRAM调度器之间的最小延迟（以核心时钟周期为单位）。此选项与<code>-rop_latency</code>一起工作，以模拟最小DRAM访问延迟（<code>=rop_latency+DRAM_latency</code>）。</td>
+</tr>
+<tr>
+<td align="left">互连配置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-inter_config_file &lt;Path to Interconnection Config file&gt;</code></td>
+<td align="left">包含互连网络模拟器选项的文件。有关互连配置的更多详细信息，请参见<a target="_blank" rel="noopener" href="http://cva.stanford.edu/books/ppin/">[6]</a>中随原始代码提供的手册。注意，模拟器中不应使用<code>4.6 Traffic</code>和<code>4.7 Simulation parameters</code>下的选项。另请参阅<a href="#%E4%BA%92%E8%BF%9E%E9%85%8D%E7%BD%AE">#互连配置</a>。</td>
+</tr>
+<tr>
+<td align="left"><code>-network_mode</code></td>
+<td align="left">要使用的互连网络模式（默认值=1）</td>
+</tr>
+<tr>
+<td align="left">PTX配置</td>
+<td align="left"></td>
+</tr>
+<tr>
+<td align="left">选项</td>
+<td align="left">描述</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_use_cuobjdump</code></td>
+<td align="left">使用cuobjdump提取ptx/sass（0=否，1=是）仅限CUDA 4.0</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_convert_to_ptxplus</code></td>
+<td align="left">将嵌入式ptx转换为ptxplus（0=否，1=是）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_save_converted_ptxplus</code></td>
+<td align="left">将转换后的ptxplus保存到文件（0=否，1=是）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_force_max_capability</code></td>
+<td align="left">强制最大计算能力（默认值为0）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_inst_debug_to_file</code></td>
+<td align="left">将执行的指令的调试信息转储到文件中（0=否，1=是）</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_inst_debug_file</code></td>
+<td align="left">输出文件以转储已执行指令的调试信息</td>
+</tr>
+<tr>
+<td align="left"><code>-gpgpu_ptx_inst_debug_thread_uid</code></td>
+<td align="left">已执行指令的调试输出的线程uid</td>
+</tr>
+</tbody></table>
 <p><span id="互连配置"></span></p>
 <h3 id="（一）互连配置"><a href="#（一）互连配置" class="headerlink" title="（一）互连配置"></a>（一）互连配置</h3><p>GPGPU Sim3.x使用booksim路由器模拟器来模拟互连网络。大多数情况下，您需要查阅booksim文档，了解如何配置互连。然而，下面我们列出了需要考虑的特殊注意事项，以确保您的修改与GPGPU-Sim一起使用。</p>
 <p><span id="拓扑配置"></span></p>
@@ -878,7 +1454,27 @@ This page has been accessed 259,808 times.
 </tbody></table>
 <h3 id="（二）简单瓶颈分析"><a href="#（二）简单瓶颈分析" class="headerlink" title="（二）简单瓶颈分析"></a>（二）简单瓶颈分析</h3><p>这些性能计数器跟踪GPU不同高级部分的暂停事件。结合起来，它们给出了应用程序的GPU瓶颈在哪里的广义概念。下图显示出了通过GPGPU-Sim中的存储器子系统的存储器请求的简化流程：</p>
 <p><img src="/2022/12/21/GPGPU-Sim-3-x-%E4%B8%AD%E6%96%87%E6%89%8B%E5%86%8C/Memreqflow.png" alt="Memory request flow diagram" srcset="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20300%20300'%3E%3C/svg%3E" data-src="/2022/12/21/GPGPU-Sim-3-x-%E4%B8%AD%E6%96%87%E6%89%8B%E5%86%8C/Memreqflow.png" class="lozad post-image"></p>
-<p>以下是每个计数器的说明：<br>| 统计 | 描述 |<br>|:—-|:—-|<br>|<code>gpgpu_n_stall_shd_mem</code>| 由以下原因之一导致的内存阶段的流水线暂停周期数： 共享内存Bank冲突；非合并存储器存取；串行化常数存储器存取。|<br>|<code>gpu_stall_dramfull</code>| 互连输出到DRAM Channel的暂停周期数。|<br>|<code>gpu_stall_icnt2sh</code>| 由于互连拥塞导致DRAM Channel停滞的周期数。|</p>
+<p>以下是每个计数器的说明：</p>
+<table>
+<thead>
+<tr>
+<th align="left">统计</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>gpgpu_n_stall_shd_mem</code></td>
+<td align="left">由以下原因之一导致的内存阶段的流水线暂停周期数： 共享内存Bank冲突；非合并存储器存取；串行化常数存储器存取。</td>
+</tr>
+<tr>
+<td align="left"><code>gpu_stall_dramfull</code></td>
+<td align="left">互连输出到DRAM Channel的暂停周期数。</td>
+</tr>
+<tr>
+<td align="left"><code>gpu_stall_icnt2sh</code></td>
+<td align="left">由于互连拥塞导致DRAM Channel停滞的周期数。</td>
+</tr>
+</tbody></table>
 <h3 id="（三）内存访问统计信息"><a href="#（三）内存访问统计信息" class="headerlink" title="（三）内存访问统计信息"></a>（三）内存访问统计信息</h3><table>
 <thead>
 <tr>
@@ -935,9 +1531,89 @@ This page has been accessed 259,808 times.
 <td align="left">内存请求从DRAM Channel返回指定Sahder Core的最大延迟</td>
 </tr>
 </tbody></table>
-<h3 id="（四）控制流统计信息"><a href="#（四）控制流统计信息" class="headerlink" title="（四）控制流统计信息"></a>（四）控制流统计信息</h3><p>GPGPU-Sim报告了warp占用率分布，该分布测量了CUDA应用程序中分支分歧导致的性能损失。该信息在文本<code>&quot;Warp Occupancy Distribution:&quot;</code>后的单行中报告。或者，您可以<code>grep W0_Idle</code>。分布以以下格式显示：<code>＜bin＞:＜cycle count＞</code>。以下是每个bin的含义：<br>| 统计 | 描述 |<br>|:—-|:—-|<br>|<code>Stall</code>|Sahder Core流水线暂停且无法发出任何指令时的周期数|<br>|<code>W0_Idle</code>|当所有可用的warp都被发送到流水线并且没有准备好执行下一条指令时的周期数|<br>|<code>W0_Scoreboard</code>|所有可用warp都在等待内存中的数据时的周期数|<br>|<code>WX (where X = 1 to 32)</code>|将具有X个活动线程的warp调度到流水线中时的周期数|</p>
+<h3 id="（四）控制流统计信息"><a href="#（四）控制流统计信息" class="headerlink" title="（四）控制流统计信息"></a>（四）控制流统计信息</h3><p>GPGPU-Sim报告了warp占用率分布，该分布测量了CUDA应用程序中分支分歧导致的性能损失。该信息在文本<code>&quot;Warp Occupancy Distribution:&quot;</code>后的单行中报告。或者，您可以<code>grep W0_Idle</code>。分布以以下格式显示：<code>＜bin＞:＜cycle count＞</code>。以下是每个bin的含义：</p>
+<table>
+<thead>
+<tr>
+<th align="left">统计</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>Stall</code></td>
+<td align="left">Sahder Core流水线暂停且无法发出任何指令时的周期数</td>
+</tr>
+<tr>
+<td align="left"><code>W0_Idle</code></td>
+<td align="left">当所有可用的warp都被发送到流水线并且没有准备好执行下一条指令时的周期数</td>
+</tr>
+<tr>
+<td align="left"><code>W0_Scoreboard</code></td>
+<td align="left">所有可用warp都在等待内存中的数据时的周期数</td>
+</tr>
+<tr>
+<td align="left"><code>WX (where X = 1 to 32)</code></td>
+<td align="left">将具有X个活动线程的warp调度到流水线中时的周期数</td>
+</tr>
+</tbody></table>
 <p>没有分支发散的代码应该不会产生<code>WX</code>的循环，其中<code>X</code>介于1和31之间。有关详细信息，请参阅<a target="_blank" rel="noopener" href="http://doi.acm.org/10.1145/1543753.1543756">动态warp形成：SIMD图形硬件上的高效MIMD控制流</a>。</p>
-<h3 id="（五）DRAM统计信息"><a href="#（五）DRAM统计信息" class="headerlink" title="（五）DRAM统计信息"></a>（五）DRAM统计信息</h3><p>默认情况下，GPGPU-Sim报告每个DRAM Channel的以下统计信息：<br>| 统计 | 描述 |<br>|:—-|:—-|<br>|<code>n_cmd</code>| DRAM Channel中内存控制器已消逝的命令周期总数。控制器可以在每个命令周期发出单个命令。|<br>|<code>n_nop</code>| 内存控制器发出的NOP命令总数。|<br>|<code>n_act</code>| 内存控制器发出的Row Activation命令总数。|<br>|<code>n_pre</code>| 内存控制器发出的Precharge命令总数。|<br>|<code>n_req</code>| DRAM Channel处理的内存请求总数。|<br>|<code>n_rd</code>| 内存控制器发出的读取命令总数。|<br>|<code>n_write</code>| 内存控制器发出的写入命令总数。|<br>|<code>bw_util</code>| DRAM带宽利用率=2*(<code>n_rd</code>+<code>n_write</code>)/<code>n_cmd</code>。|<br>|<code>n_activity</code>| 内存控制器队列中有挂起请求时的活动周期或命令周期总数。|<br>|<code>dram_eff</code>| DRAM效率=2*(<code>n_rd</code>+<code>n_write</code>)/<code>n_activity</code>（即，当有待处理的挂起请求时的DRAM带宽利用率）。|<br>|<code>mrqq: max</code>| 最大内存请求队列占用率。（即队列中挂起条目的最大数量）。|<br>|<code>mrqq: avg</code>| 平均内存请求队列占用率。（即队列中挂起条目的平均数量）。|</p>
+<h3 id="（五）DRAM统计信息"><a href="#（五）DRAM统计信息" class="headerlink" title="（五）DRAM统计信息"></a>（五）DRAM统计信息</h3><p>默认情况下，GPGPU-Sim报告每个DRAM Channel的以下统计信息：</p>
+<table>
+<thead>
+<tr>
+<th align="left">统计</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>n_cmd</code></td>
+<td align="left">DRAM Channel中内存控制器已消逝的命令周期总数。控制器可以在每个命令周期发出单个命令。</td>
+</tr>
+<tr>
+<td align="left"><code>n_nop</code></td>
+<td align="left">内存控制器发出的NOP命令总数。</td>
+</tr>
+<tr>
+<td align="left"><code>n_act</code></td>
+<td align="left">内存控制器发出的Row Activation命令总数。</td>
+</tr>
+<tr>
+<td align="left"><code>n_pre</code></td>
+<td align="left">内存控制器发出的Precharge命令总数。</td>
+</tr>
+<tr>
+<td align="left"><code>n_req</code></td>
+<td align="left">DRAM Channel处理的内存请求总数。</td>
+</tr>
+<tr>
+<td align="left"><code>n_rd</code></td>
+<td align="left">内存控制器发出的读取命令总数。</td>
+</tr>
+<tr>
+<td align="left"><code>n_write</code></td>
+<td align="left">内存控制器发出的写入命令总数。</td>
+</tr>
+<tr>
+<td align="left"><code>bw_util</code></td>
+<td align="left">DRAM带宽利用率=2*(<code>n_rd</code>+<code>n_write</code>)/<code>n_cmd</code>。</td>
+</tr>
+<tr>
+<td align="left"><code>n_activity</code></td>
+<td align="left">内存控制器队列中有挂起请求时的活动周期或命令周期总数。</td>
+</tr>
+<tr>
+<td align="left"><code>dram_eff</code></td>
+<td align="left">DRAM效率=2*(<code>n_rd</code>+<code>n_write</code>)/<code>n_activity</code>（即，当有待处理的挂起请求时的DRAM带宽利用率）。</td>
+</tr>
+<tr>
+<td align="left"><code>mrqq: max</code></td>
+<td align="left">最大内存请求队列占用率。（即队列中挂起条目的最大数量）。</td>
+</tr>
+<tr>
+<td align="left"><code>mrqq: avg</code></td>
+<td align="left">平均内存请求队列占用率。（即队列中挂起条目的平均数量）。</td>
+</tr>
+</tbody></table>
 <h3 id="（六）Cache统计信息"><a href="#（六）Cache统计信息" class="headerlink" title="（六）Cache统计信息"></a>（六）Cache统计信息</h3><p>对于每个缓存（普通数据缓存、常量缓存、纹理缓存等），GPGPU Sim报告以下统计信息：</p>
 <ul>
 <li><code>Access</code>=访问缓存的总次数</li>
@@ -952,7 +1628,31 @@ This page has been accessed 259,808 times.
 <li><code>total_dl1_miss_rate</code></li>
 </ul>
 <p>请注意，当L1缓存关闭时，应忽略<code>L1 Total Miss Rate</code>的数据：<code>-gpgpu_cache:dl1 none</code></p>
-<h3 id="（七）互连统计信息"><a href="#（七）互连统计信息" class="headerlink" title="（七）互连统计信息"></a>（七）互连统计信息</h3><p>在GPGPU-Sim中，用户可以配置是在单个互连网络上运行所有流量，还是在两个单独的物理网络上运行（一个将数据从Sahder Core中继到DRAM Cahnnel，另一个则将数据中继回来）。（除了增加带宽外，使用两个独立网络的动机通常是为了避免<code>协议死锁（protocol deadlock）</code>，否则需要额外的专用虚拟通道。）GPGPU-Sim报告了每个独立互连网络的以下统计数据：<br>| 统计 | 描述 |<br>|:—-|:—-|<br>|<code>average latency</code>|单个微片从源节点到目标节点的平均延迟。|<br>|<code>average accepted rate</code>|相对于总输入channel吞吐量，测量的网络平均吞吐量。请注意，当使用两个单独的网络进行不同方向的流量时，某些节点将永远不会将数据注入网络（即，仅输出的节点，如核心上的DRAM Channel）。要获得实际比率，应忽略这些节点的总输入channel吞吐量。这意味着应该将该速率与比率（该网络中的<code>total #nodes</code>/<code># input nodes</code>）相乘，以获得实际平均接受速率。注意，默认情况下，我们使用两个独立的网络，这是由互连网络配置文件中的<code>network_count</code>选项设置的。这两个网络用于打破可能导致死锁的循环依赖关系。|<br>|<code>min accepted rate</code>|始终为0，因为有些节点不会向网络中注入微片，这是因为我们模拟了两个不同方向的流量网络。|<br>|<code>latency_stat_0_freq</code>|显示网络中经过的微片的延迟分布的直方图。|</p>
+<h3 id="（七）互连统计信息"><a href="#（七）互连统计信息" class="headerlink" title="（七）互连统计信息"></a>（七）互连统计信息</h3><p>在GPGPU-Sim中，用户可以配置是在单个互连网络上运行所有流量，还是在两个单独的物理网络上运行（一个将数据从Sahder Core中继到DRAM Cahnnel，另一个则将数据中继回来）。（除了增加带宽外，使用两个独立网络的动机通常是为了避免<code>协议死锁（protocol deadlock）</code>，否则需要额外的专用虚拟通道。）GPGPU-Sim报告了每个独立互连网络的以下统计数据：</p>
+<table>
+<thead>
+<tr>
+<th align="left">统计</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>average latency</code></td>
+<td align="left">单个微片从源节点到目标节点的平均延迟。</td>
+</tr>
+<tr>
+<td align="left"><code>average accepted rate</code></td>
+<td align="left">相对于总输入channel吞吐量，测量的网络平均吞吐量。请注意，当使用两个单独的网络进行不同方向的流量时，某些节点将永远不会将数据注入网络（即，仅输出的节点，如核心上的DRAM Channel）。要获得实际比率，应忽略这些节点的总输入channel吞吐量。这意味着应该将该速率与比率（该网络中的<code>total #nodes</code>/<code># input nodes</code>）相乘，以获得实际平均接受速率。注意，默认情况下，我们使用两个独立的网络，这是由互连网络配置文件中的<code>network_count</code>选项设置的。这两个网络用于打破可能导致死锁的循环依赖关系。</td>
+</tr>
+<tr>
+<td align="left"><code>min accepted rate</code></td>
+<td align="left">始终为0，因为有些节点不会向网络中注入微片，这是因为我们模拟了两个不同方向的流量网络。</td>
+</tr>
+<tr>
+<td align="left"><code>latency_stat_0_freq</code></td>
+<td align="left">显示网络中经过的微片的延迟分布的直方图。</td>
+</tr>
+</tbody></table>
 <p>注：网络的接受流量或吞吐量是指传送到网络目标终端的流量。如果网络低于饱和，则网络接受所有提供的流量，并且提供的流量将等于网络的吞吐量。互连模拟器通过将在节点处接收的分组总数除以总网络周期来计算每个节点的接受率。</p>
 <p><span id="可视化高层次GPGPUSim微体系结构行为"></span></p>
 <h2 id="五、可视化高层次GPGPU-Sim微体系结构行为"><a href="#五、可视化高层次GPGPU-Sim微体系结构行为" class="headerlink" title="五、可视化高层次GPGPU Sim微体系结构行为"></a>五、可视化高层次GPGPU Sim微体系结构行为</h2><p>AerialVision是GPGPU-Sim的GPU性能分析工具，包含在<a target="_blank" rel="noopener" href="http://www.ece.ubc.ca/~aamodt/papers/aerialvision.ispass2010.pdf">ISPASS 2010论文</a>中介绍的GPGPU-Sim源代码中。可以在<a target="_blank" rel="noopener" href="http://gpgpu-sim.org/manual/index.php/AerialVision_Manual">此处</a>找到详细的手册，介绍如何使用AerialVision。</p>
@@ -973,6 +1673,7 @@ This page has been accessed 259,808 times.
 <p>此级别的可见性对于调试非常有用，可以帮助您深入了解模拟GPU微架构的工作原理。</p>
 <p>GPGPU-Sim发行版附带的<code>.gdbinit</code>文件中提供了这些GDB宏。要使用这些宏，请将文件复制到主目录或启动GDB的同一目录。GDB将自动检测宏文件的存在，加载宏文件并显示以下消息：</p>
 <pre class="highlight"><span class="line">** loading GPGPU-Sim debugging macros... **</span><br></pre>
+
 <table>
 <thead>
 <tr>
@@ -1233,7 +1934,51 @@ This page has been accessed 259,808 times.
 <td align="left">为可视化器输出动态统计数据。</td>
 </tr>
 </tbody></table>
-<h3 id="（四）intersim"><a href="#（四）intersim" class="headerlink" title="（四）intersim"></a>（四）intersim</h3><p>仅列出从原始Booksim修改的文件：<br>| 文件名 | 描述 |<br>|:—-|:—-|<br>|<code>booksim_config.cpp</code>|intersim的配置选项在此定义，并给出了一个默认值。|<br>|<code>flit.hpp</code>|修改后，增加了为<code>flits</code>携带数据的能力。<code>flits</code>也知道它们属于哪个网络。|<br>|<code>interconnect_interface.cpp/.h</code>|GPGPU-Sim和intersim之间的接口在此实现。|<br>|<code>iq_router.cpp/.hpp</code>|修改后添加了对<code>output_extra_latency</code>的支持（用于创建<a target="_blank" rel="noopener" href="http://ieeexplore.ieee.org/xpl/articleDetails.jsp?reload=true&arnumber=4919648">ISPASS 2009论文</a>的图10）。<br>|<code>islip.cpp</code>|进行了一些小的编辑，以修复一个数组边界外的错误。|<br>|<code>Makefile</code>|修改后，创建了一个库，而不是独立的网络模拟器。|<br>|<code>stats.cpp/.hpp</code>|统计收集功能在这个文件中。我们做了一些小调整。例如，我们添加了一个名为<code>NeverUsed</code>的新函数，它可以告诉我们这个特定的统计数据是否被更新过。|<br>|<code>statwraper.cpp/.h</code>|一个封装器，可以在<code>C</code>文件中使用<code>stats.cpp</code>中的<code>Stat类</code>实现的状态收集功能。|<br>|<code>trafficmanager.cpp/.hpp</code>|对原始的booksim进行了大量的修改。许多高水平的操作在这里完成。|</p>
+<h3 id="（四）intersim"><a href="#（四）intersim" class="headerlink" title="（四）intersim"></a>（四）intersim</h3><p>仅列出从原始Booksim修改的文件：</p>
+<table>
+<thead>
+<tr>
+<th align="left">文件名</th>
+<th align="left">描述</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>booksim_config.cpp</code></td>
+<td align="left">intersim的配置选项在此定义，并给出了一个默认值。</td>
+</tr>
+<tr>
+<td align="left"><code>flit.hpp</code></td>
+<td align="left">修改后，增加了为<code>flits</code>携带数据的能力。<code>flits</code>也知道它们属于哪个网络。</td>
+</tr>
+<tr>
+<td align="left"><code>interconnect_interface.cpp/.h</code></td>
+<td align="left">GPGPU-Sim和intersim之间的接口在此实现。</td>
+</tr>
+<tr>
+<td align="left"><code>iq_router.cpp/.hpp</code></td>
+<td align="left">修改后添加了对<code>output_extra_latency</code>的支持（用于创建<a target="_blank" rel="noopener" href="http://ieeexplore.ieee.org/xpl/articleDetails.jsp?reload=true&arnumber=4919648">ISPASS 2009论文</a>的图10）。</td>
+</tr>
+<tr>
+<td align="left"><code>islip.cpp</code></td>
+<td align="left">进行了一些小的编辑，以修复一个数组边界外的错误。</td>
+</tr>
+<tr>
+<td align="left"><code>Makefile</code></td>
+<td align="left">修改后，创建了一个库，而不是独立的网络模拟器。</td>
+</tr>
+<tr>
+<td align="left"><code>stats.cpp/.hpp</code></td>
+<td align="left">统计收集功能在这个文件中。我们做了一些小调整。例如，我们添加了一个名为<code>NeverUsed</code>的新函数，它可以告诉我们这个特定的统计数据是否被更新过。</td>
+</tr>
+<tr>
+<td align="left"><code>statwraper.cpp/.h</code></td>
+<td align="left">一个封装器，可以在<code>C</code>文件中使用<code>stats.cpp</code>中的<code>Stat类</code>实现的状态收集功能。</td>
+</tr>
+<tr>
+<td align="left"><code>trafficmanager.cpp/.hpp</code></td>
+<td align="left">对原始的booksim进行了大量的修改。许多高水平的操作在这里完成。</td>
+</tr>
+</tbody></table>
 <p><span id="选项解析器"></span></p>
 <h2 id="二、选项解析器"><a href="#二、选项解析器" class="headerlink" title="二、选项解析器"></a>二、选项解析器</h2><p>当你为你的研究修改GPGPU-Sim时, 你可能会增加一些你想在不同的模拟中进行不同配置的功能。GPGPU-Sim 3.x提供了一个通用的命令行选项解析器，允许不同的软件模块通过一个简单的接口来注册他们的选项。选项解析器在<code>gpgpusim_entrypoint.cc</code>的<code>gpgpu_ptx_sim_init_perf()</code> 中实例化。选项在<code>gpgpu_sim_config::reg_options()</code>中使用函数添加。</p>
 <pre class="highlight"><span class="line"><span class="function"><span class="type">void</span> <span class="title">option_parser_register</span><span class="params">(<span class="type">option_parser_t</span> opp, </span></span></span><br><span class="line"><span class="params"><span class="function">                            <span class="type">const</span> <span class="type">char</span> *name, </span></span></span><br><span class="line"><span class="params"><span class="function">                            <span class="keyword">enum</span> option_dtype type, </span></span></span><br><span class="line"><span class="params"><span class="function">                            <span class="type">void</span> *variable, </span></span></span><br><span class="line"><span class="params"><span class="function">                            <span class="type">const</span> <span class="type">char</span> *desc,  </span></span></span><br><span class="line"><span class="params"><span class="function">                            <span class="type">const</span> <span class="type">char</span> *defaultvalue)</span></span>;</span><br></pre>
@@ -1704,7 +2449,59 @@ This page has been accessed 259,808 times.
 <h3 id="（九）通用内存空间"><a href="#（九）通用内存空间" class="headerlink" title="（九）通用内存空间"></a>（九）通用内存空间</h3><p>通用寻址是NVIDIA PTX 2.0中引入的一项功能，指令<code>ld</code>、<code>ldu</code>、<code>st</code>、<code>prefetch</code>、<code>prefetchu</code>、<code>isspacep</code>、<code>cvta</code>、<code>atom</code>和<code>red</code>支持通用寻址。在通用寻址中，一个地址映射到全局内存，除非它位于本地内存窗口或共享内存窗口内。在这些窗口内，一个地址映射到本地或共享内存中的相应位置，即从通用地址中减去窗口基数形成的地址，以形成隐含状态空间的偏移。所以一条指令可以使用通用寻址来处理可能对应于全局、本地或共享内存空间的地址。</p>
 <p>GPGPU-Sim中的通用寻址是由指令<code>ld</code>, <code>ldu</code>, <code>st</code>, <code>isspacep</code>和<code>cvta</code>支持的。函数<code>generic_to_&#123;shared, local, global&#125;</code>, <code>&#123;shared, local, global&#125;_to_generic</code>和<code>isspace_&#123;shared, local, global&#125;</code>（都定义在<code>cuda_sim.cc</code>中）被用来支持GPGPU-Sim中的通用寻址，并使用前面提到的指令。</p>
 <p>标识符（<code>SHARED_GENERIC_START</code>, <code>SHARED_MEM_SIZE_MAX</code>, <code>LOCAL_GENERIC_START</code>, <code>TOTAL_LOCAL_MEM_PER_SM</code>, <code>LOCAL_MEM_SIZE_MAX</code>, <code>GLOBAL_HEAP_START</code>和<code>STATIC_ALLOC_LIMIT</code>）被定义在<code>abstract_hardware_model.h</code>中，用于定义不同内存空间边界（窗口）。这些标识符被用来推导和生成不同的地址空间，这也是支持通用寻址的需要。</p>
-<p>下表显示了代码中如何定义这些空间的例子：<br>| 标识符 | 值 |<br>|:—-|:—-|<br>|<code>GLOBAL_HEAP_START</code>|<code>0x80000000</code>|<br>|<code>SHARED_MEM_SIZE_MAX</code>|<code>64*1024</code>|<br>|<code>LOCAL_MEM_SIZE_MAX</code>|<code>8*1024</code>|<br>|<code>MAX_STREAMING_MULTIPROCESSORS</code>|<code>64</code>|<br>|<code>MAX_THREAD_PER_SM</code>|<code>2048</code>|<br>|<code>TOTAL_LOCAL_MEM_PER_SM</code>|<code>MAX_THREAD_PER_SM*LOCAL_MEM_SIZE_MAX</code>|<br>|<code>TOTAL_SHARED_MEM</code>|<code>MAX_STREAMING_MULTIPROCESSORS*SHARED_MEM_SIZE_MAX</code>|<br>|<code>TOTAL_LOCAL_MEM</code>|<code>MAX_STREAMING_MULTIPROCESSORS*MAX_THREAD_PER_SM*LOCAL_MEM_SIZE_MAX</code>|<br>|<code>SHARED_GENERIC_START</code>|<code>GLOBAL_HEAP_START-TOTAL_SHARED_MEM</code>|<br>|<code>LOCAL_GENERIC_START</code>|<code>SHARED_GENERIC_START-TOTAL_LOCAL_MEM</code>|<br>|<code>STATIC_ALLOC_LIMIT</code>|<code>GLOBAL_HEAP_START - (TOTAL_LOCAL_MEM+TOTAL_SHARED_MEM) </code>|</p>
+<p>下表显示了代码中如何定义这些空间的例子：</p>
+<table>
+<thead>
+<tr>
+<th align="left">标识符</th>
+<th align="left">值</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left"><code>GLOBAL_HEAP_START</code></td>
+<td align="left"><code>0x80000000</code></td>
+</tr>
+<tr>
+<td align="left"><code>SHARED_MEM_SIZE_MAX</code></td>
+<td align="left"><code>64*1024</code></td>
+</tr>
+<tr>
+<td align="left"><code>LOCAL_MEM_SIZE_MAX</code></td>
+<td align="left"><code>8*1024</code></td>
+</tr>
+<tr>
+<td align="left"><code>MAX_STREAMING_MULTIPROCESSORS</code></td>
+<td align="left"><code>64</code></td>
+</tr>
+<tr>
+<td align="left"><code>MAX_THREAD_PER_SM</code></td>
+<td align="left"><code>2048</code></td>
+</tr>
+<tr>
+<td align="left"><code>TOTAL_LOCAL_MEM_PER_SM</code></td>
+<td align="left"><code>MAX_THREAD_PER_SM*LOCAL_MEM_SIZE_MAX</code></td>
+</tr>
+<tr>
+<td align="left"><code>TOTAL_SHARED_MEM</code></td>
+<td align="left"><code>MAX_STREAMING_MULTIPROCESSORS*SHARED_MEM_SIZE_MAX</code></td>
+</tr>
+<tr>
+<td align="left"><code>TOTAL_LOCAL_MEM</code></td>
+<td align="left"><code>MAX_STREAMING_MULTIPROCESSORS*MAX_THREAD_PER_SM*LOCAL_MEM_SIZE_MAX</code></td>
+</tr>
+<tr>
+<td align="left"><code>SHARED_GENERIC_START</code></td>
+<td align="left"><code>GLOBAL_HEAP_START-TOTAL_SHARED_MEM</code></td>
+</tr>
+<tr>
+<td align="left"><code>LOCAL_GENERIC_START</code></td>
+<td align="left"><code>SHARED_GENERIC_START-TOTAL_LOCAL_MEM</code></td>
+</tr>
+<tr>
+<td align="left"><code>STATIC_ALLOC_LIMIT</code></td>
+<td align="left"><code>GLOBAL_HEAP_START - (TOTAL_LOCAL_MEM+TOTAL_SHARED_MEM) </code></td>
+</tr>
+</tbody></table>
 <p>注意，在这种地址空间划分下，每个线程最多只能有<code>8kB</code>的本地内存（<code>LOCAL_MEM_SIZE_MAX</code>）。在CUDA计算能力1.3及以下版本中，每个线程最多可以有<code>16kB</code>的本地内存。在CUDA计算能力2.0的情况下，这一限制增加到<code>512kB</code><a target="_blank" rel="noopener" href="http://developer.nvidia.com/nvidia-gpu-computing-documentation">[7]</a>。用户可以增加<code>LOCAL_MEM_SIZE_MAX</code>来支持每个线程需要超过<code>8kB</code>本地内存的应用。然而，应该始终确保<code>GLOBAL_HEAP_START &gt; (TOTAL_LOCAL_MEM + TOTAL_SHARED_MEM)</code>。如果不这样做，可能会导致错误的模拟行为。</p>
 <p>要获得更多关于通用寻址的信息，请参考NVIDIA的<code>&lt;&lt;PTX: Parallel Thread Execution ISA Version 2.0 manual&gt;&gt;</code><a target="_blank" rel="noopener" href="http://developer.nvidia.com/nvidia-gpu-computing-documentation">[8]</a>。</p>
 <h3 id="（十）指令执行"><a href="#（十）指令执行" class="headerlink" title="（十）指令执行"></a>（十）指令执行</h3><p>在解析之后，用于功能执行的指令被表示为包含在<code>function_info</code>对象中的<code>ptx_instruction</code>对象（见<code>cuda-sim/ptx_ir.&#123;h，cc&#125;</code>）。每个标量线程由一个<code>ptx_thread_info</code>对象表示。执行一条指令（功能上）主要是通过调用<code>ptx_thread_info::ptx_exec_inst()</code>完成的。</p>
